@@ -1,0 +1,26 @@
+using Lab05.DAL.Entinies;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Lab05.BUS
+{
+    public class MajorService
+    {
+        private readonly StudentModel _context;
+        public MajorService(StudentModel context)
+        {
+            _context = context;
+        }
+        public List<Major> GetAllByFaculty(int facultyID)
+        {
+            return _context.Major.Where(p => p.FacultyID == facultyID).ToList();
+        }
+        public List<Major> GetMajorsByFacultyId(int facultyId)
+        {
+            return _context.Major.Where(m => m.FacultyID == facultyId).ToList();
+        }
+    }
+}
