@@ -1,0 +1,22 @@
+using Lab05.DAL.Entinies;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Lab05.BUS
+{
+    public class FacultyService
+    {
+        private readonly StudentModel _context;
+        public FacultyService(StudentModel context)
+        {
+            _context = context;
+        }
+        public List<Faculty> GetAll()
+        {
+            return _context.Faculty.ToList();
+        }
+    }
+}
