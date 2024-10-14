@@ -1,0 +1,70 @@
+using Lab05.DAL.Entinies;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Lab05.BUS
+{
+    public class StudentService
+
+    {
+        private readonly StudentModel _context;
+
+        public StudentService(StudentModel context)
+        {
+            _context = context;
+        }
+
+        public List<Student> GetAll()
+        {
+            {
+                return _context.Student.ToList();
+            }
+        }
+        public List<Student> GetAllHasNoMajor()
+        {
+            return _context.Student.Where(p => p.MajorID == null).ToList();
+        }
+        public List<Student> GetAllHasNoMinor(int facultyID)
+        {
+            return _context.Student.Where(p => p.MajorID == null && p.FacultyID == facultyID).ToList();
+        }
+        public Student FindByID(int studentID)
+        {
+            return _context.Student.FirstOrDefault(p => p.StudentID == studentID);
+        }
+
+        public void InsertOrUpdate(Student s)
+        {
+            var existingStudent = _context.Student.FirstOrDefault(p => p.StudentID == s.StudentID);
+
+            if (existingStudent != null)
+            {
+                // Cập nhật thông tin sinh viên
+                _context.Entry(existingStudent).CurrentValues.SetValues(s);
+            }
+            else
+            {
+                // Thêm mới sinh viên nếu không tồn tại
+                _context.Student.Add(s);
+            }
+
+            // Lưu các thay đổi vào cơ sở dữ liệu
+            _context.SaveChanges();
+        }
+        public void Delete(string studentID)
+        {
+            using (var context = new StudentModel())
+            {
+                var student = context.Student.FirstOrDefault(p => p.StudentID == studentID);
+                if (student != null)
+                {
+                    context.Student.Remove(student);
+                    context.SaveChanges();
+                }
+            }
+        }
+    }
+}
