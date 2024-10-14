@@ -1,0 +1,326 @@
+
+using Lab05.BUS;
+using Lab05.DAL.Entinies;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+
+
+namespace BtapT6
+{
+   
+    public partial class frmStudent : Form
+    {
+        private readonly StudentService studentService;
+        private readonly FacultyService facultyService;
+        public frmStudent()
+        {
+            InitializeComponent();
+
+            var context = new StudentModel();
+            studentService = new StudentService(context);
+            facultyService = new FacultyService(context);
+        }
+        private void frmStudent_Load(object sender, EventArgs e)
+        {
+            checkBox1.CheckedChanged += new EventHandler(checkBox1_CheckedChanged);
+            try
+            {
+                setGridViewStyle(dataGridView1); // Thiết lập kiểu hiển thị cho DataGridView
+
+                // Lấy danh sách Khoa từ cơ sở dữ liệu và hiển thị lên ComboBox
+                var listFacultys = facultyService.GetAll();
+                var listStudents = studentService.GetAll();
+
+                FillFacultyCombobox(listFacultys); // Điền dữ liệu vào ComboBox
+               // BindGrid(listStudents); // Điền dữ liệu vào DataGridView
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message); // Hiển thị thông báo lỗi
+            }
+        }
+
+        // Hàm binding list dữ liệu khoa vào ComboBox
+        private void FillFacultyCombobox(List<Faculty> listFacultys)
+        {
+            // Thêm một mục mặc định vào đầu danh sách
+            listFacultys.Insert(0, new Faculty { FacultyID = 0, FacultyName = "Chọn Khoa" });
+
+            // Đặt DataSource cho ComboBox
+            this.cmbFaculty.DataSource = listFacultys;
+            this.cmbFaculty.DisplayMember = "FacultyName";
+            this.cmbFaculty.ValueMember = "FacultyID";
+        }
+
+        // Hàm binding DataGridView từ danh sách sinh viên
+        private void BindGrid(List<Student> listStudent)
+        {
+            dataGridView1.Rows.Clear(); // Xóa các hàng cũ trong DataGridView
+
+            foreach (var item in listStudent)
+            {
+                int index = dataGridView1.Rows.Add(); // Thêm một hàng mới
+                dataGridView1.Rows[index].Cells[0].Value = item.StudentID;
+                dataGridView1.Rows[index].Cells[1].Value = item.FullName;
+
+                // Hiển thị tên khoa nếu có
+                if (item.Faculty != null)
+                    dataGridView1.Rows[index].Cells[2].Value = item.Faculty.FacultyName;
+
+                // Hiển thị điểm trung bình
+                dataGridView1.Rows[index].Cells[3].Value = item.AverageScore + "";
+
+                // Hiển thị tên chuyên ngành nếu có
+                if (item.MajorID != null)
+                    dataGridView1.Rows[index].Cells[4].Value = item.Major?.Name ?? "";
+
+                ShowAvatar(item.Avatar); // Hiển thị ảnh đại diện
+            }
+        }
+
+        // Hàm hiển thị ảnh đại diện của sinh viên
+        private void ShowAvatar(string imageName)
+        {
+            if (string.IsNullOrEmpty(imageName))
+            {
+                pictureBox1.Image = null;
+            }
+            else
+            {
+                string imagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", imageName);
+                if (File.Exists(imagePath))
+                {
+                    pictureBox1.Image = Image.FromFile(imagePath);
+                }
+                else
+                {
+                    pictureBox1.Image = null;
+                }
+            }
+            pictureBox1.Refresh();
+        }
+        private void LoadAvatar(int studentID)
+        {
+            string folderPath = Path.Combine(Application.StartupPath, "Images");
+            var student = studentService.FindByID(studentID);
+            if (student == null && !string.IsNullOrEmpty(student.Avatar))
+            {
+                string avatarFilePath = Path.Combine(folderPath, student.Avatar);
+                if (File.Exists(avatarFilePath))
+                {
+                    pictureBox1.Image = Image.FromFile(avatarFilePath);
+                }
+                else
+                {
+                    pictureBox1.Image = null;
+                }
+            }
+        }
+        private string SaveAvatar(string filePath, string studentID)
+        {
+            try
+            {
+                string directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images");
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                string fileName = $"{studentID}_{Path.GetFileName(filePath)}";
+                string newFilePath = Path.Combine(directoryPath, fileName);
+                File.Copy(filePath, newFilePath, true); // Ghi đè file nếu đã tồn tại
+
+                return fileName;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving avatar: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+        }
+
+
+        // Hàm thiết lập kiểu hiển thị cho DataGridView
+        public void setGridViewStyle(DataGridView dgview)
+        {
+            dgview.BorderStyle = BorderStyle.None;
+            dgview.DefaultCellStyle.SelectionBackColor = Color.DarkTurquoise;
+            dgview.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgview.BackgroundColor = Color.White;
+            dgview.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            var listStudents = new List<Student>();
+            if (this.checkBox1.Checked)
+            {
+                listStudents = studentService.GetAllHasNoMajor();
+            }
+            else // Ngược lại, lấy toàn bộ danh sách sinh viên
+            {
+                listStudents = studentService.GetAll();
+            }
+
+            // Bind dữ liệu vào DataGridView
+            BindGrid(listStudents);
+        }
+
+        private void btnAdd_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!ValidateInputs()) return;
+
+                var student = studentService.FindByID(txtID.Text.Trim()) ?? new Student();
+
+                student.StudentID = txtID.Text.Trim();
+                student.FullName = txtName.Text.Trim();
+
+                if (!double.TryParse(txtGPA.Text.Trim(), out double averageScore))
+                {
+                    MessageBox.Show("Invalid score format!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                student.AverageScore = averageScore;
+
+                if (!int.TryParse(cmbFaculty.SelectedValue.ToString(), out int facultyID))
+                {
+                    MessageBox.Show("Invalid Faculty ID!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                student.FacultyID = facultyID;
+
+                // Nếu đã chọn ảnh avatar, lưu ảnh vào thư mục
+                if (!string.IsNullOrEmpty(avatarFilePath))
+                {
+                    string avatarFileName = SaveAvatar(avatarFilePath, txtID.Text);
+                    if (!string.IsNullOrEmpty(avatarFileName))
+                    {
+                        student.Avatar = avatarFileName;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Error saving avatar.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+
+                // Thêm hoặc cập nhật sinh viên vào cơ sở dữ liệu
+                studentService.InsertOrUpdate(student);
+                BindGrid(studentService.GetAll()); // Cập nhật lại gridview sau khi thêm
+                ClearFormFields(); // Xóa các trường input sau khi thêm
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding student: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private bool ValidateInputs()
+        {
+            if (string.IsNullOrWhiteSpace(txtID.Text))
+            {
+                MessageBox.Show("Student ID is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtName.Text))
+            {
+                MessageBox.Show("Student name is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtGPA.Text) || !double.TryParse(txtGPA.Text, out _))
+            {
+                MessageBox.Show("Valid GPA is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            if (cmbFaculty.SelectedValue == null || (int)cmbFaculty.SelectedValue == 0)
+            {
+                MessageBox.Show("Faculty must be selected.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            return true; // Tất cả các trường hợp hợp lệ
+        }
+
+        private void ClearFormFields()
+        {
+            // Xóa nội dung trong các TextBox
+            txtID.Clear();
+            txtName.Clear();
+            txtGPA.Clear();
+
+            // Đặt ComboBox về giá trị mặc định (ví dụ: Khoa đầu tiên)
+            if (cmbFaculty.Items.Count > 0)
+            {
+                cmbFaculty.SelectedIndex = 0; // Chọn mục đầu tiên trong danh sách ComboBox
+            }
+
+            // Xóa ảnh đại diện (nếu có)
+            pictureBox1.Image = null;
+
+            // Đặt đường dẫn ảnh avatar thành chuỗi rỗng
+            avatarFilePath = string.Empty;
+
+            // Nếu cần thiết, có thể thêm các trường khác cần xóa nội dung ở đây
+        }
+
+        private string avatarFilePath = string.Empty;
+        private void button1_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = " image files (*.jpg; *jpeg; *.png)|*.jpg; *jpeg; *.png";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    avatarFilePath = ofd.FileName;
+                    pictureBox1.Image = Image.FromFile(avatarFilePath);
+                }
+
+            }
+        }
+        private void btnDel_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dataGridView1.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Please select a student to delete.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var selectedRow = dataGridView1.SelectedRows[0];
+                string studentID = selectedRow.Cells[0].Value.ToString();
+
+                var result = MessageBox.Show($"Are you sure you want to delete student with ID: {studentID}?", "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (result == DialogResult.Yes)
+                {
+                    // Thực hiện xóa sinh viên
+                    studentService.Delete(studentID);
+
+                    // Cập nhật lại danh sách sinh viên
+                    BindGrid(studentService.GetAll());
+
+                    MessageBox.Show("Student deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting student: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+    }
+    }
+    
